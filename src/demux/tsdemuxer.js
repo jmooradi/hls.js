@@ -220,11 +220,10 @@
     // try to parse last PES packets
     if (avcData && (pes = parsePES(avcData))) {
       parseAVCPES(pes,true);
-      avcTrack.pesData = null;
-    } else {
-      // either avcData null or PES truncated, keep it for next frag parsing
-      avcTrack.pesData = avcData;
     }
+    // Always keep the current video PES packet for next fragment parsing in
+    // case additional PES packets are included in the following fragment
+    avcTrack.pesData = avcData;
 
     if (audioData && (pes = parsePES(audioData))) {
       if (audioTrack.isAAC) {
@@ -432,9 +431,8 @@
       // 9 bytes : 6 bytes for PES header + 3 bytes for PES extension
       payloadStartOffset = pesHdrLen + 9;
 
-      stream.size -= payloadStartOffset;
       //reassemble PES packet
-      pesData = new Uint8Array(stream.size);
+      pesData = new Uint8Array(stream.size - payloadStartOffset);
       for( let j = 0, dataLen = data.length; j < dataLen ; j++) {
         frag = data[j];
         let len = frag.byteLength;
