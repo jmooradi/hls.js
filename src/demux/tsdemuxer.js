@@ -217,10 +217,6 @@
         this.observer.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47'});
       }
     }
-    // try to parse last PES packets
-    if (avcData && (pes = parsePES(avcData))) {
-      parseAVCPES(pes,true);
-    }
     // Always keep the current video PES packet for next fragment parsing in
     // case additional PES packets are included in the following fragment
     avcTrack.pesData = avcData;
