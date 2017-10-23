@@ -355,7 +355,16 @@ class BufferController extends EventHandler {
     if (details.fragments.length === 0) {
       return;
     }
-    this._levelDuration = details.totalduration + details.fragments[0].start;
+
+    if(details.live && this.hls.config.liveFlushBeforeStartOffset && details.fragments[0].start > 0) {
+      this.hls.trigger(Event.BUFFER_FLUSHING, {startOffset: 0, endOffset: details.fragments[0].start});
+    }
+
+    if(details.live && this.hls.config.liveInfiniteDuration) {
+      this._levelDuration = Infinity;
+    } else {
+      this._levelDuration = details.totalduration + details.fragments[0].start;
+    }
     this.updateMediaElementDuration();
   }
 
