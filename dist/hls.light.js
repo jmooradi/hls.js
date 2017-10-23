@@ -7381,6 +7381,20 @@ var stream_controller_StreamController = function (_EventHandler) {
       return;
     }
 
+    if (levelInfo.details) {
+      var maxMaxBufLen = this.hls.config.maxMaxBufferLength;
+      var live = levelInfo.details.live;
+      if (this.hls.media.currentTime && !live) {
+        var leftBuffer = this.hls.media.currentTime - 10;
+        if (leftBuffer > 0) {
+          this.hls.trigger(events["a" /* default */].BUFFER_FLUSHING, { startOffset: 0, endOffset: leftBuffer });
+        }
+        if (this.hls.media.currentTime + maxMaxBufLen < this.hls.media.duration) {
+          this.hls.trigger(events["a" /* default */].BUFFER_FLUSHING, { startOffset: this.hls.media.currentTime + maxMaxBufLen, endOffset: this.hls.media.duration });
+        }
+      }
+    }
+
     // if buffer length is less than maxBufLen try to load a new fragment ...
     logger["b" /* logger */].trace('buffer length of ' + bufferLen.toFixed(3) + ' is below max of ' + maxBufLen.toFixed(3) + '. checking for more payload ...');
 
@@ -10065,7 +10079,16 @@ var buffer_controller_BufferController = function (_EventHandler) {
     if (details.fragments.length === 0) {
       return;
     }
-    this._levelDuration = details.totalduration + details.fragments[0].start;
+
+    if (details.live && this.hls.config.liveFlushBeforeStartOffset && details.fragments[0].start > 0) {
+      this.hls.trigger(events["a" /* default */].BUFFER_FLUSHING, { startOffset: 0, endOffset: details.fragments[0].start });
+    }
+
+    if (details.live && this.hls.config.liveInfiniteDuration) {
+      this._levelDuration = Infinity;
+    } else {
+      this._levelDuration = details.totalduration + details.fragments[0].start;
+    }
     this.updateMediaElementDuration();
   };
 
@@ -10762,6 +10785,8 @@ var hlsDefaultConfig = {
   liveMaxLatencyDurationCount: Infinity, // used by stream-controller
   liveSyncDuration: undefined, // used by stream-controller
   liveMaxLatencyDuration: undefined, // used by stream-controller
+  liveInfiniteDuration: false, // used by stream-controller
+  liveFlushBeforeStartOffset: false, // used by stream-controller
   maxMaxBufferLength: 600, // used by stream-controller
   enableWorker: true, // used by demuxer
   enableSoftwareAES: true, // used by decrypter
