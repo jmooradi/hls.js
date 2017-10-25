@@ -227,20 +227,6 @@ class StreamController extends EventHandler {
       return;
     }
 
-    if(levelInfo.details) {
-      let maxMaxBufLen = this.hls.config.maxMaxBufferLength;
-      let live = levelInfo.details.live;
-      if(this.hls.media.currentTime && !live) {
-        let leftBuffer = this.hls.media.currentTime - 10;
-        if(leftBuffer > 0) {
-          this.hls.trigger(Event.BUFFER_FLUSHING, {startOffset: 0, endOffset: leftBuffer});
-        }
-        if(this.hls.media.currentTime + maxMaxBufLen < this.hls.media.duration) {
-          this.hls.trigger(Event.BUFFER_FLUSHING, {startOffset: this.hls.media.currentTime + maxMaxBufLen, endOffset: this.hls.media.duration});
-        }
-      }
-    }
-
     // if buffer length is less than maxBufLen try to load a new fragment ...
     logger.trace(`buffer length of ${bufferLen.toFixed(3)} is below max of ${maxBufLen.toFixed(3)}. checking for more payload ...`);
 
