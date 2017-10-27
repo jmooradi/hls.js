@@ -384,7 +384,7 @@ class BufferController extends EventHandler {
         mediaSource = this.mediaSource,
         sourceBuffer = this.sourceBuffer,
         levelDuration = this._levelDuration;
-    if (levelDuration === null || !media || !mediaSource) {
+    if (levelDuration === null || !media || !mediaSource || mediaSource.readyState !== 'open') {
       return;
     }
     for (let type in sourceBuffer) {
