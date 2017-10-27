@@ -334,8 +334,15 @@ class StreamController extends EventHandler {
         let liveSyncPosition = this.liveSyncPosition = this.computeLivePosition(start, levelDetails);
         logger.log(`buffer end: ${bufferEnd.toFixed(3)} is located too far from the end of live sliding playlist, reset currentTime to : ${liveSyncPosition.toFixed(3)}`);
         bufferEnd = liveSyncPosition;
-        if (media && media.readyState && media.duration > liveSyncPosition) {
-          media.currentTime = liveSyncPosition;
+
+        if (media && media.readyState && end > liveSyncPosition) {
+          // When the media duration is InFinity, we can't seek beyond the buffer ranges.  We must recover the player.
+          if(media.duration === Infinity) {
+            this.hls.recoverMediaError();
+            return null;
+          } else {
+            media.currentTime = liveSyncPosition;
+          }
         }
         this.nextLoadPosition = liveSyncPosition;
     }
@@ -409,7 +416,7 @@ class StreamController extends EventHandler {
       //  ...--------><-----------------------------><---------....
       // previous frag         matching fragment         next frag
       //  return -1             return 0                 return 1
-      //logger.log(`level/sn/start/end/bufEnd:${level}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
+      //logger.log(`level/sn/start/end/bufEnd:${this.currentLevel}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
       // Set the lookup tolerance to be small enough to detect the current segment - ensures we don't skip over very small segments
       let candidateLookupTolerance = Math.min(maxFragLookUpTolerance, candidate.duration + (candidate.deltaPTS ? candidate.deltaPTS : 0));
       if (candidate.start + candidate.duration - candidateLookupTolerance <= bufferEnd) {

@@ -3058,9 +3058,14 @@ var tsdemuxer_TSDemuxer = function () {
         this.observer.trigger(events["a" /* default */].ERROR, { type: errors["b" /* ErrorTypes */].MEDIA_ERROR, details: errors["a" /* ErrorDetails */].FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47' });
       }
     }
-    // Always keep the current video PES packet for next fragment parsing in
-    // case additional PES packets are included in the following fragment
-    avcTrack.pesData = avcData;
+    // try to parse last PES packets
+    if (avcData && (pes = parsePES(avcData))) {
+      parseAVCPES(pes, true);
+      avcTrack.pesData = null;
+    } else {
+      // either avcData null or PES truncated, keep it for next frag parsing
+      avcTrack.pesData = avcData;
+    }
 
     if (audioData && (pes = parsePES(audioData))) {
       if (audioTrack.isAAC) {
@@ -3284,8 +3289,9 @@ var tsdemuxer_TSDemuxer = function () {
       // 9 bytes : 6 bytes for PES header + 3 bytes for PES extension
       payloadStartOffset = pesHdrLen + 9;
 
+      stream.size -= payloadStartOffset;
       //reassemble PES packet
-      pesData = new Uint8Array(stream.size - payloadStartOffset);
+      pesData = new Uint8Array(stream.size);
       for (var j = 0, dataLen = data.length; j < dataLen; j++) {
         frag = data[j];
         var len = frag.byteLength;
@@ -10075,16 +10081,7 @@ var buffer_controller_BufferController = function (_EventHandler) {
     if (details.fragments.length === 0) {
       return;
     }
-
-    if (details.live && this.hls.config.liveFlushBeforeStartOffset && details.fragments[0].start > 0) {
-      this.hls.trigger(events["a" /* default */].BUFFER_FLUSHING, { startOffset: 0, endOffset: details.fragments[0].start });
-    }
-
-    if (details.live && this.hls.config.liveInfiniteDuration) {
-      this._levelDuration = Infinity;
-    } else {
-      this._levelDuration = details.totalduration + details.fragments[0].start;
-    }
+    this._levelDuration = details.totalduration + details.fragments[0].start;
     this.updateMediaElementDuration();
   };
 
@@ -14916,8 +14913,6 @@ var hlsDefaultConfig = {
   liveMaxLatencyDurationCount: Infinity, // used by stream-controller
   liveSyncDuration: undefined, // used by stream-controller
   liveMaxLatencyDuration: undefined, // used by stream-controller
-  liveInfiniteDuration: false, // used by stream-controller
-  liveFlushBeforeStartOffset: false, // used by stream-controller
   maxMaxBufferLength: 600, // used by stream-controller
   enableWorker: true, // used by demuxer
   enableSoftwareAES: true, // used by decrypter
@@ -15560,81 +15555,38 @@ function webpackBootstrapFunc (modules) {
   return f.default || f // try to call default if defined to also support babel esmodule exports
 }
 
-var moduleNameReqExp = '[\\.|\\-|\\+|\\w|\/|@]+'
-var dependencyRegExp = '\\((\/\\*.*?\\*\/)?\s?.*?(' + moduleNameReqExp + ').*?\\)' // additional chars when output.pathinfo is true
-
 // http://stackoverflow.com/a/2593661/130442
 function quoteRegExp (str) {
   return (str + '').replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&')
 }
 
-function getModuleDependencies (sources, module, queueName) {
-  var retval = {}
-  retval[queueName] = []
-
+function getModuleDependencies (module) {
+  var retval = []
   var fnString = module.toString()
   var wrapperSignature = fnString.match(/^function\s?\(\w+,\s*\w+,\s*(\w+)\)/)
   if (!wrapperSignature) return retval
-  var webpackRequireName = wrapperSignature[1]
 
-  // main bundle deps
-  var re = new RegExp('(\\\\n|\\W)' + quoteRegExp(webpackRequireName) + dependencyRegExp, 'g')
+  var webpackRequireName = wrapperSignature[1]
+  var re = new RegExp('(\\\\n|\\W)' + quoteRegExp(webpackRequireName) + '\\((\/\\*.*?\\*\/)?\s?.*?([\\.|\\-|\\w|\/|@]+).*?\\)', 'g') // additional chars when output.pathinfo is true
   var match
   while ((match = re.exec(fnString))) {
-    if (match[3] === 'dll-reference') continue
-    retval[queueName].push(match[3])
+    retval.push(match[3])
   }
-
-  // dll deps
-  re = new RegExp('\\(' + quoteRegExp(webpackRequireName) + '\\("(dll-reference\\s(' + moduleNameReqExp + '))"\\)\\)' + dependencyRegExp, 'g')
-  while ((match = re.exec(fnString))) {
-    if (!sources[match[2]]) {
-      retval[queueName].push(match[1])
-      sources[match[2]] = __webpack_require__(match[1]).m
-    }
-    retval[match[2]] = retval[match[2]] || []
-    retval[match[2]].push(match[4])
-  }
-
   return retval
 }
 
-function hasValuesInQueues (queues) {
-  var keys = Object.keys(queues)
-  return keys.reduce(function (hasValues, key) {
-    return hasValues || queues[key].length > 0
-  }, false)
-}
-
 function getRequiredModules (sources, moduleId) {
-  var modulesQueue = {
-    main: [moduleId]
-  }
-  var requiredModules = {
-    main: []
-  }
-  var seenModules = {
-    main: {}
-  }
+  var modulesQueue = [moduleId]
+  var requiredModules = []
+  var seenModules = {}
 
-  while (hasValuesInQueues(modulesQueue)) {
-    var queues = Object.keys(modulesQueue)
-    for (var i = 0; i < queues.length; i++) {
-      var queueName = queues[i]
-      var queue = modulesQueue[queueName]
-      var moduleToCheck = queue.pop()
-      seenModules[queueName] = seenModules[queueName] || {}
-      if (seenModules[queueName][moduleToCheck] || !sources[queueName][moduleToCheck]) continue
-      seenModules[queueName][moduleToCheck] = true
-      requiredModules[queueName] = requiredModules[queueName] || []
-      requiredModules[queueName].push(moduleToCheck)
-      var newModules = getModuleDependencies(sources, sources[queueName][moduleToCheck], queueName)
-      var newModulesKeys = Object.keys(newModules)
-      for (var j = 0; j < newModulesKeys.length; j++) {
-        modulesQueue[newModulesKeys[j]] = modulesQueue[newModulesKeys[j]] || []
-        modulesQueue[newModulesKeys[j]] = modulesQueue[newModulesKeys[j]].concat(newModules[newModulesKeys[j]])
-      }
-    }
+  while (modulesQueue.length) {
+    var moduleToCheck = modulesQueue.pop()
+    if (seenModules[moduleToCheck] || !sources[moduleToCheck]) continue
+    seenModules[moduleToCheck] = true
+    requiredModules.push(moduleToCheck)
+    var newModules = getModuleDependencies(sources[moduleToCheck])
+    modulesQueue = modulesQueue.concat(newModules)
   }
 
   return requiredModules
@@ -15642,25 +15594,10 @@ function getRequiredModules (sources, moduleId) {
 
 module.exports = function (moduleId, options) {
   options = options || {}
-  var sources = {
-    main: __webpack_require__.m
-  }
+  var sources = __webpack_require__.m
 
-  var requiredModules = options.all ? { main: Object.keys(sources) } : getRequiredModules(sources, moduleId)
-
-  var src = ''
-
-  Object.keys(requiredModules).filter(function (m) { return m !== 'main' }).forEach(function (module) {
-    var entryModule = 0
-    while (requiredModules[module][entryModule]) {
-      entryModule++
-    }
-    requiredModules[module].push(entryModule)
-    sources[module][entryModule] = '(function(module, exports, __webpack_require__) { module.exports = __webpack_require__; })'
-    src = src + 'var ' + module + ' = (' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(entryModule)) + ')({' + requiredModules[module].map(function (id) { return '' + JSON.stringify(id) + ': ' + sources[module][id].toString() }).join(',') + '});\n'
-  })
-
-  src = src + '(' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(moduleId)) + ')({' + requiredModules.main.map(function (id) { return '' + JSON.stringify(id) + ': ' + sources.main[id].toString() }).join(',') + '})(self);'
+  var requiredModules = options.all ? Object.keys(sources) : getRequiredModules(sources, moduleId)
+  var src = '(' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(moduleId)) + ')({' + requiredModules.map(function (id) { return '' + JSON.stringify(id) + ': ' + sources[id].toString() }).join(',') + '})(self);'
 
   var blob = new window.Blob([src], { type: 'text/javascript' })
   if (options.bare) { return blob }
