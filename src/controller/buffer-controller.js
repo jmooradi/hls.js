@@ -138,6 +138,8 @@ class BufferController extends EventHandler {
       }
 
       this.mediaSource = null;
+      this._msDuration = null;
+      this._levelDuration = null;
       this.media = null;
       this.pendingTracks = {};
       this.tracks = {};
@@ -355,7 +357,19 @@ class BufferController extends EventHandler {
     if (details.fragments.length === 0) {
       return;
     }
-    this._levelDuration = details.totalduration + details.fragments[0].start;
+
+    if(this.media && this.hls.config.liveFlushBeforeStartOffset) {
+      let endOffset = Math.min(details.fragments[0].start, this.media.currentTime - 10);
+      if(details.live && endOffset > 0) {
+        this.hls.trigger(Event.BUFFER_FLUSHING, {startOffset: 0, endOffset: endOffset});
+      }
+    }
+
+    if(details.live && this.hls.config.liveInfiniteDuration) {
+      this._levelDuration = Infinity;
+    } else {
+      this._levelDuration = details.totalduration + details.fragments[0].start;
+    }
     this.updateMediaElementDuration();
   }
 
@@ -383,7 +397,7 @@ class BufferController extends EventHandler {
     // not using mediaSource.duration as the browser may tweak this value
     // only update mediasource duration if its value increase, this is to avoid
     // flushing already buffered portion when switching between quality level
-    if ((levelDuration > this._msDuration && levelDuration > duration) || (duration === Infinity || isNaN(duration) )) {
+    if ((levelDuration != this._msDuration) && ((levelDuration > this._msDuration && levelDuration > duration) || (duration === Infinity || isNaN(duration) ))) {
       logger.log(`Updating mediasource duration to ${levelDuration.toFixed(3)}`);
       this._msDuration = mediaSource.duration = levelDuration;
     }

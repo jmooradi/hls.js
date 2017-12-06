@@ -40,6 +40,8 @@
   - [`liveMaxLatencyDurationCount`](#livemaxlatencydurationcount)
   - [`liveSyncDuration`](#livesyncduration)
   - [`liveMaxLatencyDuration`](#livemaxlatencyduration)
+  - [`liveInfiniteDuration`](#liveinfiniteduration)
+  - [`liveFlushBeforeStartOffset`](#liveflushbeforestartoffset)
   - [`enableWorker`](#enableworker)
   - [`enableSoftwareAES`](#enablesoftwareaes)
   - [`startLevel`](#startlevel)
@@ -308,6 +310,8 @@ Configuration parameters could be provided to hls.js upon instantiation of `Hls`
       maxFragLookUpTolerance: 0.2,
       liveSyncDurationCount: 3,
       liveMaxLatencyDurationCount: 10,
+      liveInfiniteDuration: false,
+      liveFlushBeforeStartOffset: false,
       enableWorker: true,
       enableSoftwareAES: true,
       manifestLoadingTimeOut: 10000,
@@ -520,6 +524,18 @@ maximum delay allowed from edge of live, expressed in multiple of `EXT-X-TARGETD
 if set to 10, the player will seek back to `liveSyncDurationCount` whenever the next fragment to be loaded is older than N-10, N being the last fragment of the live playlist.
 If set, this value must be stricly superior to `liveSyncDurationCount`
 a value too close from `liveSyncDurationCount` is likely to cause playback stalls.
+
+### `liveInfiniteDuration`
+
+(default: `false`)
+
+Enable whether the video tag should have an Infinite duration.  This will disable scrubbing of the player in the default browser controls.  The MediaElement.currentTime api will still allow seeking within the sliding window.
+
+### `liveFlushBeforeStartOffset`
+
+(default: `false`)
+
+Enable automatic flushing of the buffer outside of the current sliding window.  This is only applicable if `liveInfiniteDuration` is set to true.
 
 ### `liveSyncDuration`
 

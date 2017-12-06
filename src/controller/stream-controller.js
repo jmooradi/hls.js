@@ -89,7 +89,7 @@ class StreamController extends EventHandler {
         this.loadedmetadata = false;
       }
       // if startPosition undefined but lastCurrentTime set, set startPosition to last currentTime
-      if (lastCurrentTime > 0 && startPosition === -1) {
+      if (lastCurrentTime >= 0 && startPosition === -1) {
         logger.log(`override startPosition with lastCurrentTime @${lastCurrentTime.toFixed(3)}`);
         startPosition = lastCurrentTime;
       }
@@ -285,6 +285,7 @@ class StreamController extends EventHandler {
     // find fragment index, contiguous with end of buffer position
     let start = fragments[0].start,
         end = fragments[fragLen-1].start + fragments[fragLen-1].duration,
+        bufferStart = bufferInfo.start,
         bufferEnd = bufferInfo.end,
         frag;
 
@@ -299,7 +300,7 @@ class StreamController extends EventHandler {
           return;
         }
 
-        frag = this._ensureFragmentAtLivePoint(levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen);
+        frag = this._ensureFragmentAtLivePoint(levelDetails, bufferStart, bufferEnd, start, end, fragPrevious, fragments, fragLen);
         // if it explicitely returns null don't load any fragment and exit function now
         if (frag === null) {
           return;
@@ -321,7 +322,7 @@ class StreamController extends EventHandler {
     return;
   }
 
-  _ensureFragmentAtLivePoint(levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen) {
+  _ensureFragmentAtLivePoint(levelDetails, bufferStart, bufferEnd, start, end, fragPrevious, fragments, fragLen) {
     const config = this.hls.config, media = this.media;
 
     let frag;
@@ -334,8 +335,16 @@ class StreamController extends EventHandler {
         let liveSyncPosition = this.liveSyncPosition = this.computeLivePosition(start, levelDetails);
         logger.log(`buffer end: ${bufferEnd.toFixed(3)} is located too far from the end of live sliding playlist, reset currentTime to : ${liveSyncPosition.toFixed(3)}`);
         bufferEnd = liveSyncPosition;
-        if (media && media.readyState && media.duration > liveSyncPosition) {
-          media.currentTime = liveSyncPosition;
+        
+        if (media && media.readyState && end > liveSyncPosition) {
+          // When the media duration is Infinity we can't seek past the current buffer. We must load the fragment we want to seek to into the buffer.  Return the required fragment
+          if(media.duration === Infinity && liveSyncPosition >= this.nextLoadPosition) {
+            this.hls.recoverMediaError();
+            return null;
+          } else {
+            logger.log(`seek to liveSyncPosition: ${liveSyncPosition}`);
+            media.currentTime = liveSyncPosition;
+          }
         }
         this.nextLoadPosition = liveSyncPosition;
     }
@@ -409,7 +418,7 @@ class StreamController extends EventHandler {
       //  ...--------><-----------------------------><---------....
       // previous frag         matching fragment         next frag
       //  return -1             return 0                 return 1
-      //logger.log(`level/sn/start/end/bufEnd:${level}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
+      //logger.log(`level/sn/start/end/bufEnd:${this.currentLevel}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
       // Set the lookup tolerance to be small enough to detect the current segment - ensures we don't skip over very small segments
       let candidateLookupTolerance = Math.min(maxFragLookUpTolerance, candidate.duration + (candidate.deltaPTS ? candidate.deltaPTS : 0));
       if (candidate.start + candidate.duration - candidateLookupTolerance <= bufferEnd) {
