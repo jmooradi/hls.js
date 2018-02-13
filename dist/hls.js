@@ -7,7 +7,7 @@
 		exports["Hls"] = factory();
 	else
 		root["Hls"] = factory();
-})(this, function() {
+})(typeof self !== 'undefined' ? self : this, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -360,7 +360,7 @@ var ErrorDetails = {
 (function(root) { 
 /* jshint ignore:end */
 
-  var URL_REGEX = /^((?:[^\/;?#]+:)?)(\/\/[^\/\;?#]*)?(.*?)??(;.*?)?(\?.*?)?(#.*?)?$/;
+  var URL_REGEX = /^((?:[a-zA-Z0-9+\-.]+:)?)(\/\/[^\/\;?#]*)?(.*?)??(;.*?)?(\?.*?)?(#.*?)?$/;
   var FIRST_SEGMENT_REGEX = /^([^\/;?#]*)(.*)$/;
   var SLASH_DOT_REGEX = /(?:\/|^)\.(?=\/)/g;
   var SLASH_DOT_DOT_REGEX = /(?:\/|^)\.\.\/(?!\.\.\/).*?(?=\/)/g;
@@ -370,7 +370,7 @@ var ErrorDetails = {
     // E.g
     // With opts.alwaysNormalize = false (default, spec compliant)
     // http://a.com/b/cd + /e/f/../g => http://a.com/e/f/../g
-    // With opts.alwaysNormalize = true (default, not spec compliant)
+    // With opts.alwaysNormalize = true (not spec compliant)
     // http://a.com/b/cd + /e/f/../g => http://a.com/e/g
     buildAbsoluteURL: function(baseURL, relativeURL, opts) {
       opts = opts || {};
@@ -930,6 +930,17 @@ var FastAESKey = function () {
 // CONCATENATED MODULE: ./src/crypt/aes-decryptor.js
 function aes_decryptor__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+// PKCS7
+function removePadding(buffer) {
+  var outputBytes = buffer.byteLength;
+  var paddingBytes = outputBytes && new DataView(buffer).getUint8(outputBytes - 1);
+  if (paddingBytes) {
+    return buffer.slice(0, outputBytes - paddingBytes);
+  } else {
+    return buffer;
+  }
+}
+
 var AESDecryptor = function () {
   function AESDecryptor() {
     aes_decryptor__classCallCheck(this, AESDecryptor);
@@ -1195,7 +1206,7 @@ var AESDecryptor = function () {
       offset = offset + 4;
     }
 
-    return outputInt32.buffer;
+    return removePadding(outputInt32.buffer);
   };
 
   AESDecryptor.prototype.destroy = function destroy() {
@@ -2899,15 +2910,8 @@ var sample_aes_SampleAesDecrypter = function () {
       if (!sync) {
         localthis.decryptAacSamples(samples, sampleIndex + 1, callback);
       }
-<<<<<<< HEAD
-    }
-    // Always keep the current video PES packet for next fragment parsing in
-    // case additional PES packets are included in the following fragment
-    avcTrack.pesData = avcData;
-=======
     });
   };
->>>>>>> aa4fa1b4dd6af42f37be5925d85347f1f07173a3
 
   SampleAesDecrypter.prototype.decryptAacSamples = function decryptAacSamples(samples, sampleIndex, callback) {
     for (;; sampleIndex++) {
@@ -3002,33 +3006,6 @@ var sample_aes_SampleAesDecrypter = function () {
 // CONCATENATED MODULE: ./src/demux/tsdemuxer.js
 function tsdemuxer__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-<<<<<<< HEAD
-      //reassemble PES packet
-      pesData = new Uint8Array(stream.size - payloadStartOffset);
-      for (var j = 0, dataLen = data.length; j < dataLen; j++) {
-        frag = data[j];
-        var len = frag.byteLength;
-        if (payloadStartOffset) {
-          if (payloadStartOffset > len) {
-            // trim full frag if PES header bigger than frag
-            payloadStartOffset -= len;
-            continue;
-          } else {
-            // trim partial frag if PES header smaller than frag
-            frag = frag.subarray(payloadStartOffset);
-            len -= payloadStartOffset;
-            payloadStartOffset = 0;
-          }
-        }
-        pesData.set(frag, i);
-        i += len;
-      }
-      if (pesLen) {
-        // payload size : remove PES header + PES extension
-        pesLen -= pesHdrLen + 3;
-      }
-      return { data: pesData, pts: pesPts, dts: pesDts, len: pesLen };
-=======
 /**
  * highly optimized TS demuxer:
  * parse PAT, PMT
@@ -3078,7 +3055,6 @@ var tsdemuxer_TSDemuxer = function () {
   TSDemuxer.prototype.setDecryptData = function setDecryptData(decryptdata) {
     if (decryptdata != null && decryptdata.key != null && decryptdata.method === 'SAMPLE-AES') {
       this.sampleAes = new sample_aes(this.observer, this.config, decryptdata, this.discardEPB);
->>>>>>> aa4fa1b4dd6af42f37be5925d85347f1f07173a3
     } else {
       this.sampleAes = null;
     }
@@ -3319,14 +3295,9 @@ var tsdemuxer_TSDemuxer = function () {
         this.observer.trigger(events["a" /* default */].ERROR, { type: errors["b" /* ErrorTypes */].MEDIA_ERROR, details: errors["a" /* ErrorDetails */].FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47' });
       }
     }
-    // try to parse last PES packets
-    if (avcData && (pes = parsePES(avcData))) {
-      parseAVCPES(pes, true);
-      avcTrack.pesData = null;
-    } else {
-      // either avcData null or PES truncated, keep it for next frag parsing
-      avcTrack.pesData = avcData;
-    }
+    // Always keep the current video PES packet for next fragment parsing in
+    // case additional PES packets are included in the following fragment
+    avcTrack.pesData = avcData;
 
     if (audioData && (pes = parsePES(audioData))) {
       if (audioTrack.isAAC) {
@@ -3550,9 +3521,8 @@ var tsdemuxer_TSDemuxer = function () {
       // 9 bytes : 6 bytes for PES header + 3 bytes for PES extension
       payloadStartOffset = pesHdrLen + 9;
 
-      stream.size -= payloadStartOffset;
       //reassemble PES packet
-      pesData = new Uint8Array(stream.size);
+      pesData = new Uint8Array(stream.size - payloadStartOffset);
       for (var j = 0, dataLen = data.length; j < dataLen; j++) {
         frag = data[j];
         var len = frag.byteLength;
@@ -10973,7 +10943,6 @@ var buffer_controller_BufferController = function (_EventHandler) {
       this._live = details.live;
       this.updateMediaElementDuration();
     }
-<<<<<<< HEAD
 
     if (this.media && this.hls.config.liveFlushBeforeStartOffset) {
       var endOffset = Math.min(details.fragments[0].start, this.media.currentTime - 10);
@@ -10981,15 +10950,6 @@ var buffer_controller_BufferController = function (_EventHandler) {
         this.hls.trigger(events["a" /* default */].BUFFER_FLUSHING, { startOffset: 0, endOffset: endOffset });
       }
     }
-
-    if (details.live && this.hls.config.liveInfiniteDuration) {
-      this._levelDuration = Infinity;
-    } else {
-      this._levelDuration = details.totalduration + details.fragments[0].start;
-    }
-    this.updateMediaElementDuration();
-=======
->>>>>>> aa4fa1b4dd6af42f37be5925d85347f1f07173a3
   };
 
   /**
@@ -11020,17 +10980,6 @@ var buffer_controller_BufferController = function (_EventHandler) {
     if (this._msDuration === null) {
       this._msDuration = this.mediaSource.duration;
     }
-<<<<<<< HEAD
-    var duration = media.duration;
-    // levelDuration was the last value we set.
-    // not using mediaSource.duration as the browser may tweak this value
-    // only update mediasource duration if its value increase, this is to avoid
-    // flushing already buffered portion when switching between quality level
-    if (levelDuration != this._msDuration && (levelDuration > this._msDuration && levelDuration > duration || duration === Infinity || isNaN(duration))) {
-      logger["b" /* logger */].log('Updating mediasource duration to ' + levelDuration.toFixed(3));
-      this._msDuration = mediaSource.duration = levelDuration;
-=======
-
     if (this._live === true && config.liveDurationInfinity === true) {
       // Override duration to Infinity
       logger["b" /* logger */].log('Media Source duration is set to Infinity');
@@ -11042,7 +10991,6 @@ var buffer_controller_BufferController = function (_EventHandler) {
       // flushing already buffered portion when switching between quality level
       logger["b" /* logger */].log('Updating Media Source duration to ' + this._levelDuration.toFixed(3));
       this._msDuration = this.mediaSource.duration = this._levelDuration;
->>>>>>> aa4fa1b4dd6af42f37be5925d85347f1f07173a3
     }
   };
 
@@ -16401,12 +16349,8 @@ var hlsDefaultConfig = {
   liveMaxLatencyDurationCount: Infinity, // used by stream-controller
   liveSyncDuration: undefined, // used by stream-controller
   liveMaxLatencyDuration: undefined, // used by stream-controller
-<<<<<<< HEAD
-  liveInfiniteDuration: false, // used by stream-controller
   liveFlushBeforeStartOffset: false, // used by stream-controller
-=======
   liveDurationInfinity: false, // used by buffer-controller
->>>>>>> aa4fa1b4dd6af42f37be5925d85347f1f07173a3
   maxMaxBufferLength: 600, // used by stream-controller
   enableWorker: true, // used by demuxer
   enableSoftwareAES: true, // used by decrypter
