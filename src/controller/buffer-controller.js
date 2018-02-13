@@ -151,6 +151,8 @@ class BufferController extends EventHandler {
       }
 
       this.mediaSource = null;
+      this._msDuration = null;
+      this._levelDuration = null;
       this.media = null;
       this._objectUrl = null;
       this.pendingTracks = {};
@@ -370,6 +372,13 @@ class BufferController extends EventHandler {
       this._live = details.live;
       this.updateMediaElementDuration();
     }
+
+    if(this.media && this.hls.config.liveFlushBeforeStartOffset) {
+      let endOffset = Math.min(details.fragments[0].start, this.media.currentTime - 10);
+      if(details.live && endOffset > 0) {
+        this.hls.trigger(Event.BUFFER_FLUSHING, {startOffset: 0, endOffset: endOffset});
+      }
+    }
   }
 
   /**
@@ -402,7 +411,6 @@ class BufferController extends EventHandler {
     if (this._msDuration === null) {
       this._msDuration = this.mediaSource.duration;
     }
-
     if (this._live === true && config.liveDurationInfinity === true) {
       // Override duration to Infinity
       logger.log('Media Source duration is set to Infinity');
